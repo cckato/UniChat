@@ -1,39 +1,80 @@
 ﻿using UnityEngine;
 using System.Collections;
 using Tacticsoft;
+using System.Collections.Generic;
+using UnityEngine.UI;
 
-public class MyTableViewController : MonoBehaviour, ITableViewDataSource
+public class MyTableViewController : Fictbox.SceneControllerBehaviour, ITableViewDataSource
 {
     public TableView tableView;
     public MyCell cellPrefab;
     public GameObject modalCanvas;
     public GameObject intentPrefab;
+    public InputField inputField;
+
 
     private int numInstancesCreated = 0;
 
-    IEnumerator Start()
+    private ChatRoomModel chatRoomModel;
+
+
+    void Awake()
     {
+        base.Awake();
+        chatRoomModel = ModelManager.Instance.GetChatRoomModel();
         tableView.dataSource = this;
-        yield return new WaitForSeconds(1f);
-        tableView.ReloadData();
     }
 
 
+    void OnEnable()
+    {
+        chatRoomModel.Updated += OnResourceUpdated;
+    }
+
+    void Start()
+    {
+        RefreshViews();
+    }
+
+    void OnDisable()
+    {
+        chatRoomModel.Updated -= OnResourceUpdated;
+    }
+
+    void RefreshViews()
+    {
+        if (chatRoomModel.Rooms == null)
+        {
+            chatRoomModel.Fetch();
+            return;
+        }
+        tableView.ReloadData();
+        if (tableView.scrollableHeight > 0)
+        {
+            tableView.scrollY = 0.1f;
+        }
+    }
+
+
+    public void OnResourceUpdated(bool succeeded)
+    {
+        if (succeeded)
+        {
+            RefreshViews();
+        }
+    }
 
     #region ITableViewDataSource
 
 
     public int GetNumberOfRowsForTableView(TableView tableView)
     {
-        return 20;
+        return (chatRoomModel.Rooms != null) ? chatRoomModel.Rooms.Count : 0;
     }
 
     //Will be called by the TableView to know what is the height of each row
     public float GetHeightForRowInTableView(TableView tableView, int row)
     {
-//        cellHeight = (tableView.transform as RectTransform).rect.height * 0.13f;
-//        Debug.Log("CellHeight: " + cellHeight);
-//        return cellHeight;
         return (cellPrefab.transform as RectTransform).rect.height;
     }
 
@@ -47,8 +88,10 @@ public class MyTableViewController : MonoBehaviour, ITableViewDataSource
             cell = (MyCell)GameObject.Instantiate(cellPrefab);
             cell.name = "VisibleCounterCellInstance_" + (++numInstancesCreated).ToString();
         }
+
+        ChatRoom room = chatRoomModel.Rooms [row];
         cell.SetIndex(row);
-        cell.textLabel.text = "item #" + row;
+        cell.textLabel.text = room.Name;
         return cell;
     }
 
@@ -56,7 +99,6 @@ public class MyTableViewController : MonoBehaviour, ITableViewDataSource
 
     public void OnClickTableCell(TableViewCell cell, int row)
     {
-        Debug.Log("OnClick!! " + row);
         GameObject intentObj = GameObject.Instantiate(intentPrefab);
         Intent intent = intentObj.GetComponent<Intent>();
         intent.putInteger("row", row);
@@ -72,6 +114,16 @@ public class MyTableViewController : MonoBehaviour, ITableViewDataSource
     public void OnClickModalCancelButton()
     {
         modalCanvas.SetActive(false);
+    }
+
+    public void OnClickModalSendButton()
+    {
+        if (string.IsNullOrEmpty(inputField.text))
+        {
+            return;
+        }
+
+        chatRoomModel.SaveNewRoom(ChatRoom.Create(inputField.text));
     }
 
 }
