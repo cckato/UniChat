@@ -6,6 +6,7 @@ TagManager:
   tags:
   - TableViewController
   - Intent
+  - ModelManager
   layers:
   - Default
   - TransparentFX
